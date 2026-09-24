@@ -1,54 +1,38 @@
 # Process overview
 
-<!-- TEMPLATE: this file is a shape to fill in, not a form. Replace everything
-     in it with your own overview, and delete this comment — `pnpm
-     check:evidence` will remind you if it's still here. -->
-
-Written by you, for a reader: how you got from the brief to the harness and
-agentic workflow behind this submission. Markers read this file and follow its
-citations; they don't trawl the repo for evidence you didn't point at.
-
-This file is the shape; the course site's
-[assessment page](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#what-you-submit)
-is the requirement, and its
-[word counts](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#word-counts)
-cover every deliverable.
-
 ## What I built
 
-A sentence or two. `README.md` is where the account of what the app is and what
-good means here lives; this file is how you got there.
+Coursefit takes a ranked course wishlist and works out the week it can actually
+fit. When a course drops out, it says which class caused the clash and why. The
+`README.md` explains the app and what I think a good result looks like.
 
 ## How I got here
 
-The account of the process: how the work actually went, and how you knew the
-result was right. Tell it in whatever order makes it clear. A weekly prototype
-needs a paragraph or two; an assignment needs more.
+I made the first two passes on 21 September and committed them afterwards,
+grouped by concern. That history shows what changed, but not exactly when I made
+each decision.
 
-Cite the record as you go, as links whose text is the commit hash or range and
-whose target is this repo's commit or compare URL, so a reader clicks straight
-to the evidence:
+At first, a course was a set of interchangeable time slots. The scheduler ran,
+but it had no way to tell a tutorial clash from a lecture clash. Losing one
+tutorial group is inconvenient; losing a fixed lecture can mean losing the
+course. I changed the data to reflect that difference: each lecture has one
+time, while a tutorial has a choice of groups. The scheduler does not need a
+special rule for lectures. It simply runs out of options sooner ([`aca2a07`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-cxin16215-netizen/commit/aca2a07)).
 
-- one commit: [`a1b2c3d`](https://github.com/YOUR-ORG/YOUR-REPO/commit/a1b2c3d)
-- a range:
-  [`a1b2c3d...e4f5a6b`](https://github.com/YOUR-ORG/YOUR-REPO/compare/a1b2c3d...e4f5a6b)
+I used the seed data to make that decision checkable. Its two deliberate clashes
+cover both outcomes, and `spec/crit-7.test.ts` checks them over HTTP using
+course codes rather than database IDs ([`dcde187`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-cxin16215-netizen/commit/dcde187)).
 
-To pair a prompt with the commit it produced, quote the prompt (curated, not a
-full transcript) next to the citation:
+On 24 September, I asked the agent to look for the next thing worth fixing and
+to inspect the app in a real browser at desktop and phone width. It found a
+two-hour lecture drawn as one hour and a wishlist that ran off the phone screen.
+Both had passed the tests ([`5a8bb61`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-cxin16215-netizen/commit/5a8bb61)). It also noticed that a shared wishlist would let
+everyone at the crit edit the same week. I scoped the wishlist to a visitor
+cookie and added a button to rank a dropped course above the course that beat
+it, so someone can see the trade for themselves ([`cc036a4`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-cxin16215-netizen/commit/cc036a4)).
 
-> the prompt, verbatim
-
-Screenshots are welcome where one carries the point better than a sentence does.
-Commit the file to this repo and link it with a **relative** path, which is what
-makes it render on GitHub: `![alt text](docs/before.png)`. Images don't count
-towards the word count and don't replace the citation.
-
-## Before you ship
-
-`pnpm check:evidence` verifies that this comment is gone, that your citations
-resolve to real commits, that a crit week's reflection entry is in
-`reflections/`, and that your `CLAUDE.md` is there. It checks that your account
-is traceable, not that it is good: that is the marker's call.
-
-Images aren't checked: unlike a citation whose SHA doesn't resolve, a broken
-image is visible the moment this file is rendered on GitHub.
+That browser pass changed my rule for finishing a page. `CLAUDE.md` now asks for
+a check at about 400px, because an HTTP test cannot tell whether the timetable
+is readable ([`cadb2da`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-cxin16215-netizen/commit/cadb2da)). I still have not tested the explanations with someone choosing
+courses, or established that this is the part of ANU enrolment most worth
+fixing.
