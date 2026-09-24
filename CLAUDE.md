@@ -27,12 +27,16 @@ from eroding one reasonable-looking change at a time.
 - `src/lib/schema.ts` is the ground truth. To change it: edit it, run
   `pnpm db:generate`, and commit the schema and the migration together. Never
   edit a database by hand.
+- Read every migration `pnpm db:generate` writes before trusting it, and apply
+  it to a fresh database and to a copy of `.data/app.db` before committing. Its
+  SQLite output can be SQL that SQLite refuses: 0007 came out as `ADD COLUMN
+  ... NOT NULL` with no default and had to be rewritten as a table rebuild.
 - Never edit a migration that has been committed. Add a new one. The Fly volume
   keeps every migration it has applied, and Drizzle won't re-run an edited one,
   so an edited migration leaves the live database silently out of step with the
   code.
-- Reference data (the catalog, lectures and tutorials, the starting preferences)
-  arrives as hand-written seed migrations, not as seeding code that runs at
+- Reference data (the catalog and its lectures and tutorials) arrives as
+  hand-written seed migrations, not as seeding code that runs at
   startup. Each seed migration's header comment lists every deliberate collision
   the spec tests rely on. Changing the data means updating that header and those
   tests in the same commit.
@@ -41,6 +45,11 @@ from eroding one reasonable-looking change at a time.
 
 ## 3. Shape of the app
 
+- The wishlist and the preferences belong to a visitor, whose id
+  `src/middleware.ts` puts in `Astro.locals.visitor`. Every read and every write
+  of `selections` and `preferences` filters on it, including a lookup by an id
+  taken from the URL. A query without that filter leaks into somebody else's
+  week. `spec/crit-7.test.ts` checks that a hand-made request can't cross over.
 - `src/lib/scheduler.ts` stays pure: no database, Drizzle or Astro imports. A
   new rule is stated as a fixture test in `spec/scheduler.test.ts` first.
 - The core flow needs no client-side JavaScript. A form posts, the handler
@@ -76,6 +85,10 @@ from eroding one reasonable-looking change at a time.
 
 - Run `pnpm check` after every change that touches the scheduler, the schema or
   a page. Fix red immediately.
+- A change to a page isn't done until it has been looked at in a real browser,
+  at desktop width and at about 400px. The tests read HTML, not layout: a
+  two-hour lecture drawn as one hour, and a wishlist whose last two columns fell
+  off a phone screen, both passed every test.
 - Before calling the work finished: `pnpm check:evidence` passes, `README.md`
   describes the app rather than the template, and the deployed app loads at its
   `*.fly.dev` URL with a wishlist that survives a reload.

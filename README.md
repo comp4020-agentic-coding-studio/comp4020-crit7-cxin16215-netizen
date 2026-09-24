@@ -5,6 +5,8 @@ I want actually share a week? You put courses on a wishlist and rank them, say
 which half-days you want kept clear or would rather use, and it builds the week.
 Lectures stay where they are, tutorials pick whichever group still fits, and any
 course that can't be placed is listed with the exact clash that knocked it out.
+Opening it cold? **Load an example** from the empty wishlist shows both kinds of
+clash in one click.
 
 ## The slice of ANU it models
 
@@ -33,8 +35,9 @@ follows from them. It doesn't enrol you in anything.
 
 A timetable you can't argue with is worse than no timetable. Good here means
 every outcome explains itself: a dropped course names the part that couldn't be
-placed and what each of its times collided with, and the page tells you the one
-move that changes it, which is to rank that course above its rival.
+placed and what each of its times collided with. The page also offers the one
+move that changes the outcome, as a button: rank the dropped course directly
+above the course that beat it, and see the week the other way round.
 
 I chose greedy-by-priority over maximising the number of courses placed. A
 cleverer search could sometimes fit one more course overall by giving up a
@@ -43,6 +46,9 @@ ranked list says not to make.
 
 Everything works with plain forms: each change posts, redirects and re-renders
 from SQLite, so the wishlist and your times survive a reload and a redeploy.
+Each browser gets its own wishlist, so a room full of people can open the same
+URL at once without editing each other's week. The week grid fits all five days
+on a phone.
 
 ## What it leaves out
 
@@ -52,7 +58,8 @@ from SQLite, so the wishlist and your times survive a reload and a redeploy.
   COMP1100 and COMP2100 share a first tutorial group.
 - Each course has one lecture and one tutorial. There are no labs, no multiple
   lecture streams and no teaching weeks.
-- There is one shared wishlist and no accounts, like the starter's guestbook.
+- There are no accounts. A cookie ties a wishlist to one browser, so clearing
+  cookies or switching browsers starts you over.
 - Preferences are set per half-day, the grain people actually think in ("keep
   Friday clear").
 
@@ -60,9 +67,11 @@ from SQLite, so the wishlist and your times survive a reload and a redeploy.
 
 `spec/scheduler.test.ts` states the scheduling rules against hand-made data:
 priority beats wishlist order, a later course never displaces an earlier one,
-and a preference never costs a course its place. `spec/crit-7.test.ts` drives the
-running server over HTTP. It checks that the wishlist and your times survive a
-reload, that swapping two priorities swaps which course is dropped, and that a
-half-day kept clear moves a tutorial or drops a course. Whether the explanations
-read clearly, and whether this is the right slice of ANU to fix, are judgement
-calls, not tests.
+and a half-day you aim for never costs a course its place. `spec/crit-7.test.ts`
+drives the running server over HTTP. It checks that the wishlist and your times
+survive a reload, that swapping two priorities swaps which course is dropped,
+and that a half-day kept clear moves a tutorial or drops a course. It also
+checks that one visitor can't see or change another's wishlist, even with a
+hand-made request, and that the "rank above" button flips the outcome in one
+step. Whether the explanations read clearly, and whether this is the right slice
+of ANU to fix, are judgement calls, not tests.
