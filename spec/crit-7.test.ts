@@ -14,18 +14,36 @@ const baseUrl = inject("baseUrl");
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const HALVES = ["am", "pm"];
 
+// Each wishlist belongs to the browser holding its visitor cookie, so this
+// file keeps the one cookie a browser would: whatever the server last set.
+// Clearing it is how a test becomes somebody new.
+let visitor = "";
+
+function remember(res: Response): Response {
+  for (const cookie of res.headers.getSetCookie()) {
+    const held = cookie.match(/^coursefit_visitor=([^;]+)/)?.[1];
+    if (held) visitor = held;
+  }
+  return res;
+}
+
+const cookie = (): Record<string, string> =>
+  visitor ? { cookie: `coursefit_visitor=${visitor}` } : {};
+
 // Astro checks form POSTs carry a same-origin Origin header (CSRF
 // protection); browsers send it automatically, a bare fetch doesn't.
-const post = (path: string, fields: Record<string, string> = {}) =>
-  fetch(new URL(path, baseUrl), {
-    method: "POST",
-    headers: { origin: baseUrl },
-    body: new URLSearchParams(fields),
-    redirect: "manual",
-  });
+const post = async (path: string, fields: Record<string, string> = {}) =>
+  remember(
+    await fetch(new URL(path, baseUrl), {
+      method: "POST",
+      headers: { origin: baseUrl, ...cookie() },
+      body: new URLSearchParams(fields),
+      redirect: "manual",
+    }),
+  );
 
 async function page(path: string): Promise<string> {
-  const res = await fetch(new URL(path, baseUrl));
+  const res = remember(await fetch(new URL(path, baseUrl), { headers: cookie() }));
   expect(res.status).toBe(200);
   return res.text();
 }
@@ -85,7 +103,7 @@ async function add(code: string, priority: number): Promise<void> {
   expect(res.status).toBe(303);
 }
 
-/** Set the whole week at once; anything not named goes back to "fine either way". */
+/** Set the whole week at once; anything not named goes back to "either way". */
 async function setTimes(overrides: Record<string, string> = {}): Promise<void> {
   const fields: Record<string, string> = {};
   for (const day of DAYS) {
@@ -95,11 +113,10 @@ async function setTimes(overrides: Record<string, string> = {}): Promise<void> {
   expect(res.status).toBe(303);
 }
 
+// Every test is a first visit: a new visitor, an empty wishlist, a week with
+// no opinions — with nothing to clean up after the test before.
 beforeEach(async () => {
-  for (const [, row] of await wishlist()) {
-    await post(`/api/selections/${row.id}/delete`);
-  }
-  await setTimes();
+  visitor = "";
   expect([...(await wishlist()).keys()]).toEqual([]);
 });
 
@@ -227,5 +244,114 @@ describe("the week's preferences", () => {
 
     expect(section(html, "scheduled")).toContain("Nothing could be placed");
     expect(section(html, "dropped")).toMatch(/COMP1100[\s\S]*?keeping clear/);
+  });
+});
+
+describe("the wishlist is yours", () => {
+  it("keeps one visitor's wishlist out of another's", async () => {
+    await add("COMP2310", 1);
+    const first = visitor;
+
+    visitor = "";
+    expect((await wishlist()).has("COMP2310")).toBe(false);
+    expect((await addable()).has("COMP2310")).toBe(true);
+
+    visitor = first;
+    expect((await wishlist()).get("COMP2310")?.priority).toBe("1");
+  });
+
+  it("keeps one visitor's times out of another's", async () => {
+    await setTimes({ "Fri-pm": "no" });
+    const first = visitor;
+
+    visitor = "";
+    expect(await page("/times/")).toMatch(/name="Fri-pm"[\s\S]*?<option value="ok" selected/);
+
+    visitor = first;
+    expect(await page("/times/")).toMatch(/name="Fri-pm"[\s\S]*?<option value="no" selected/);
+  });
+
+  it("ignores a hand-made request against somebody else's course", async () => {
+    await add("COMP2310", 1);
+    const first = visitor;
+    const { id } = (await wishlist()).get("COMP2310")!;
+
+    visitor = "";
+    await page("/");
+    await post(`/api/selections/${id}/priority`, { priority: "9" });
+    await post(`/api/selections/${id}/delete`);
+
+    visitor = first;
+    expect((await wishlist()).get("COMP2310")?.priority).toBe("1");
+  });
+});
+
+describe("from a clash to the other outcome", () => {
+  /** The dropped section's "rank above" button, as the ids it would post. */
+  function swapOffer(html: string): { action: string; aheadOf: string } | undefined {
+    const match = section(html, "dropped").match(
+      /action="(\/api\/selections\/\d+\/promote)"[\s\S]*?name="aheadOf" value="(\d+)"/,
+    );
+    return match ? { action: match[1], aheadOf: match[2] } : undefined;
+  }
+
+  it("offers to rank a dropped course above the course that beat it", async () => {
+    await add("COMP1100", 1);
+    await add("COMP2620", 2);
+    const rows = await wishlist();
+
+    const html = await page("/schedule/");
+    const offer = swapOffer(html);
+
+    expect(offer?.action).toBe(`/api/selections/${rows.get("COMP2620")!.id}/promote`);
+    expect(offer?.aheadOf).toBe(rows.get("COMP1100")!.id);
+    expect(section(html, "dropped")).toContain("Rank COMP2620 above COMP1100");
+  });
+
+  it("swaps which course is kept in one step", async () => {
+    await add("COMP1100", 1);
+    await add("COMP2620", 2);
+    const offer = swapOffer(await page("/schedule/"))!;
+
+    const res = await post(offer.action, { aheadOf: offer.aheadOf });
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("/schedule/");
+
+    const html = await page("/schedule/");
+    expect(blocks(html).has("COMP2620 lecture")).toBe(true);
+    expect(section(html, "dropped")).toMatch(/COMP1100[\s\S]*?cannot move[\s\S]*?COMP2620/);
+
+    const rows = await wishlist();
+    expect(rows.get("COMP2620")?.priority).toBe("1");
+    expect(rows.get("COMP1100")?.priority).toBe("2");
+  });
+
+  it("offers no swap for a course lost to a half-day kept clear", async () => {
+    await add("COMP1100", 1);
+    await setTimes({ "Mon-am": "no" });
+
+    expect(swapOffer(await page("/schedule/"))).toBeUndefined();
+  });
+});
+
+describe("the example wishlist", () => {
+  it("shows both kinds of clash in one click", async () => {
+    const res = await post("/api/selections/example");
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("/schedule/");
+
+    const html = await page("/schedule/");
+    const placed = blocks(html);
+    expect(placed.get("COMP1100 lecture")).toContain("Monday 10:00 to 12:00");
+    expect(placed.get("COMP2100 tutorial")).toContain("Friday 14:00 to 15:00");
+    expect(section(html, "dropped")).toMatch(/COMP2620[\s\S]*?cannot move[\s\S]*?COMP1100/);
+  });
+
+  it("leaves a wishlist you have started alone", async () => {
+    await add("COMP2310", 1);
+
+    await post("/api/selections/example");
+
+    expect([...(await wishlist()).keys()]).toEqual(["COMP2310"]);
   });
 });

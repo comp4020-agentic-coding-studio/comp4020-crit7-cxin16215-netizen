@@ -1,10 +1,11 @@
 ---
 import CourseTimes from "../components/CourseTimes.astro";
+import TryExample from "../components/TryExample.astro";
 import Base from "../layouts/Base.astro";
 import { listCatalog, listSelections } from "../lib/db";
 
 const catalog = listCatalog();
-const wishlist = listSelections(catalog);
+const wishlist = listSelections(Astro.locals.visitor, catalog);
 
 const wishlisted = new Set(wishlist.map((row) => row.courseId));
 const available = catalog.filter((course) => !wishlisted.has(course.id));
@@ -68,11 +69,14 @@ const tone = new Map(catalog.map((course, index) => [course.id, (index % 7) + 1]
   <h2>Your wishlist</h2>
   {
     wishlist.length === 0 ? (
-      <p class="empty">Nothing here yet. Add a course above to get started.</p>
+      <div class="empty">
+        <p>Nothing here yet. Add a course above to get started.</p>
+        <TryExample />
+      </div>
     ) : (
       <>
         <div class="panel">
-          <table>
+          <table class="stack wishlist">
             <thead>
               <tr>
                 <th scope="col">Priority</th>
@@ -86,7 +90,7 @@ const tone = new Map(catalog.map((course, index) => [course.id, (index % 7) + 1]
             <tbody>
               {wishlist.map((row) => (
                 <tr>
-                  <td>
+                  <td class="cell-rank">
                     <form class="rank" method="post" action={`/api/selections/${row.id}/priority`}>
                       <input
                         type="number"
@@ -100,7 +104,7 @@ const tone = new Map(catalog.map((course, index) => [course.id, (index % 7) + 1]
                       <button class="quiet">Save</button>
                     </form>
                   </td>
-                  <td>
+                  <td class="cell-course">
                     <span class={`course tone-${tone.get(row.course.id)}`}>
                       <span class="chip" />
                       <span>
@@ -109,7 +113,7 @@ const tone = new Map(catalog.map((course, index) => [course.id, (index % 7) + 1]
                       </span>
                     </span>
                   </td>
-                  <td>
+                  <td class="cell-times">
                     <CourseTimes course={row.course} />
                   </td>
                   <td class="col-actions">
@@ -140,7 +144,7 @@ const tone = new Map(catalog.map((course, index) => [course.id, (index % 7) + 1]
     groups, and the scheduler picks whichever group still fits.
   </p>
   <div class="panel">
-    <table>
+    <table class="stack catalog">
       <thead>
         <tr>
           <th scope="col">Course</th>
@@ -151,7 +155,7 @@ const tone = new Map(catalog.map((course, index) => [course.id, (index % 7) + 1]
         {
           catalog.map((course) => (
             <tr>
-              <td>
+              <td class="cell-course">
                 <span class={`course tone-${tone.get(course.id)}`}>
                   <span class="chip" />
                   <span>
@@ -160,7 +164,7 @@ const tone = new Map(catalog.map((course, index) => [course.id, (index % 7) + 1]
                   </span>
                 </span>
               </td>
-              <td>
+              <td class="cell-times">
                 <CourseTimes course={course} />
               </td>
             </tr>

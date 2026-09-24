@@ -156,9 +156,10 @@ function combinations(components: CourseComponent[]): SlotOption[][] {
  *
  * A course is dropped only when no combination survives. Because a scheduled
  * course is never revisited, a later, less-wanted course can never bump an
- * earlier, more-wanted one — which is the whole promise the page makes. Time
- * preference only ever chooses between times a course could already have; it
- * never costs a course its place.
+ * earlier, more-wanted one — which is the whole promise the page makes. A
+ * half-day you aim for only ever chooses between times a course could already
+ * have, and never costs it its place. A half-day kept clear is a rule, not a
+ * wish: it can, and the dropped list says so.
  *
  * This is not an approximation of "closest to what you asked for": a cleverer
  * algorithm could sometimes fit one more course in total by sacrificing a

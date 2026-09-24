@@ -1,9 +1,9 @@
 ---
 import Base from "../layouts/Base.astro";
 import { listPreferences } from "../lib/db";
-import { DAYS, type Day, type Half, type Stance, halfKey } from "../lib/scheduler";
+import { DAYS, type Day, HALVES, type Half, type Stance, halfKey } from "../lib/scheduler";
 
-const preferences = listPreferences();
+const preferences = listPreferences(Astro.locals.visitor);
 
 const DAY_NAMES: Record<Day, string> = {
   Mon: "Monday",
@@ -19,18 +19,19 @@ const HALF_NAMES: Record<Half, string> = { am: "Morning", pm: "Afternoon" };
 // wish, and the difference is exactly what the scheduler does with them.
 const STANCES: { value: Stance; label: string }[] = [
   { value: "prefer", label: "Aim for it" },
-  { value: "ok", label: "Fine either way" },
+  { value: "ok", label: "Either way" },
   { value: "no", label: "Keep it clear" },
 ];
 
 const stanceAt = (day: Day, half: Half): Stance => preferences[halfKey(day, half)] ?? "ok";
 ---
 
-<Base title="My times" wide>
+<Base title="My times">
   <h1>My times</h1>
   <p class="lede">
-    Say how each half of each day suits you. This never costs you a course —
-    it only decides which tutorial a course takes when it has a choice.
+    Say how each half of each day suits you. A half-day you aim for only ever
+    steers which tutorial a course takes. A half-day you keep clear is a rule,
+    and can cost you a course whose lecture only runs then.
   </p>
 
   <h2>The week</h2>
@@ -39,16 +40,16 @@ const stanceAt = (day: Day, half: Half): Stance => preferences[halfKey(day, half
       <table class="prefs">
         <thead>
           <tr>
-            <th scope="col">Half-day</th>
-            {DAYS.map((day) => <th scope="col">{DAY_NAMES[day]}</th>)}
+            <th scope="col">Day</th>
+            {HALVES.map((half) => <th scope="col">{HALF_NAMES[half]}</th>)}
           </tr>
         </thead>
         <tbody>
           {
-            (["am", "pm"] as Half[]).map((half) => (
+            DAYS.map((day) => (
               <tr>
-                <th scope="row">{HALF_NAMES[half]}</th>
-                {DAYS.map((day) => (
+                <th scope="row">{DAY_NAMES[day]}</th>
+                {HALVES.map((half) => (
                   <td>
                     <select
                       name={halfKey(day, half)}

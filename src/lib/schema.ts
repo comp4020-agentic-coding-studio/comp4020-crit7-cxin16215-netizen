@@ -49,25 +49,32 @@ export const componentOptions = sqliteTable("component_options", {
   endMinute: int("end_minute").notNull(),
 });
 
-// The wishlist. Like the starter's guestbook, this is one shared list for
-// whoever opens the site — there are no accounts here.
-export const selections = sqliteTable("selections", {
-  id: int().primaryKey({ autoIncrement: true }),
-  // Unique: a course is either on the wishlist or it isn't. Changing your mind
-  // about how much you want it is an update, not a second row.
-  courseId: int("course_id")
-    .notNull()
-    .unique()
-    .references(() => courses.id, { onDelete: "cascade" }),
-  /** Smaller is wanted more: 1 is the top pick. Ties are allowed. */
-  priority: int().notNull(),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-});
+// The wishlist, one per visitor. There are no accounts: src/middleware.ts gives
+// each browser a random id in a cookie, and every row belongs to one of them,
+// so two people on the deployed URL never see or overwrite each other's list.
+export const selections = sqliteTable(
+  "selections",
+  {
+    id: int().primaryKey({ autoIncrement: true }),
+    visitorId: text("visitor_id").notNull(),
+    courseId: int("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    /** Smaller is wanted more: 1 is the top pick. Ties are allowed. */
+    priority: int().notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  // A course is either on your wishlist or it isn't. Changing your mind about
+  // how much you want it is an update, not a second row.
+  (table) => [unique().on(table.visitorId, table.courseId)],
+);
 
 /**
- * How the week suits you, one row per half-day — ten in all, seeded to "ok".
+ * How the week suits one visitor, one row per half-day they have saved. A
+ * half-day with no row is "ok", so a new visitor starts unopinionated without
+ * any rows being written for them.
  *
  * Half-days rather than half-hours because that is the grain people actually
  * think in ("keep Friday clear", "nothing before lunch"), and because ten
@@ -77,11 +84,12 @@ export const preferences = sqliteTable(
   "preferences",
   {
     id: int().primaryKey({ autoIncrement: true }),
+    visitorId: text("visitor_id").notNull(),
     day: text().notNull().$type<Day>(),
     half: text().notNull().$type<Half>(),
     stance: text().notNull().$type<Stance>(),
   },
-  (table) => [unique().on(table.day, table.half)],
+  (table) => [unique().on(table.visitorId, table.day, table.half)],
 );
 
 export type Course = typeof courses.$inferSelect;

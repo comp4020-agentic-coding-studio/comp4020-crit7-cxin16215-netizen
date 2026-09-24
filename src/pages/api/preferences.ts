@@ -7,7 +7,7 @@ const STANCES: Stance[] = ["no", "ok", "prefer"];
 // The form posts all ten half-days at once, so the week is saved whole. Any
 // cell missing or unrecognised keeps whatever it already had rather than
 // silently becoming "ok".
-export const POST: APIRoute = async ({ request, redirect }) => {
+export const POST: APIRoute = async ({ request, redirect, locals }) => {
   const form = await request.formData();
 
   const entries = DAYS.flatMap((day) =>
@@ -17,7 +17,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     }),
   );
 
-  setPreferences(entries);
+  setPreferences(locals.visitor, entries);
 
   return redirect("/times/", 303);
 };

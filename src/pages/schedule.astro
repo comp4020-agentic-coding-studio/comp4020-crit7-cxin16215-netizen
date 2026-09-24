@@ -1,4 +1,5 @@
 ---
+import TryExample from "../components/TryExample.astro";
 import Base from "../layouts/Base.astro";
 import { listCatalog, listPreferences, listSelections } from "../lib/db";
 import {
@@ -19,9 +20,10 @@ import {
 // function of the wishlist and the week's preferences, so there is no
 // "regenerate" button to forget: change either and the week is already
 // different next time you look.
+const { visitor } = Astro.locals;
 const catalog = listCatalog();
-const wishlist = listSelections(catalog);
-const preferences = listPreferences();
+const wishlist = listSelections(visitor, catalog);
+const preferences = listPreferences(visitor);
 const { included, dropped } = generateSchedule(catalog, wishlist, preferences);
 
 const timetable = placedSlots(included).sort(byTimetableOrder);
@@ -55,6 +57,24 @@ const explain = (option: SlotOption, obstacle: Obstacle): string =>
   obstacle.kind === "clash"
     ? `clashes with ${obstacle.with.course.code}, already scheduled at ${obstacle.at.label}`
     : `is a ${DAY_NAMES[option.day]} ${HALF_WORDS[obstacle.half]} you are keeping clear`;
+
+const selectionFor = new Map(wishlist.map((row) => [row.courseId, row.id]));
+
+/**
+ * The best-ranked course that took one of this course's times, when a clash is
+ * what cost it. Ranking the dropped course directly above that one puts it
+ * ahead of every course it clashed with, since the rest were ranked lower still.
+ */
+function rivalOf(drop: DroppedCourse) {
+  const beatenBy = new Set(
+    drop.components.flatMap((report) =>
+      report.candidates.flatMap((candidate) =>
+        candidate.obstacle?.kind === "clash" ? [candidate.obstacle.with.course.id] : [],
+      ),
+    ),
+  );
+  return included.find((scheduled) => beatenBy.has(scheduled.course.id))?.course;
+}
 
 /** The components with nowhere left to go — the ones worth explaining. */
 const stuck = (drop: DroppedCourse) =>
@@ -97,9 +117,12 @@ for (const slot of timetable) {
     wishlist.length === 0 ? (
       <>
         <p class="lede">Your wishlist is empty, so there is nothing to schedule yet.</p>
-        <p class="empty">
-          <a href="/">Add some courses</a> and come back.
-        </p>
+        <div class="empty">
+          <p>
+            <a href="/">Add some courses</a> and come back, or start from an example.
+          </p>
+          <TryExample />
+        </div>
       </>
     ) : (
       <>
@@ -172,11 +195,14 @@ for (const slot of timetable) {
           <>
             <h2 id="dropped">Couldn't fit</h2>
             <p class="hint">
-              Raise one of these above its rival on the <a href="/">wishlist</a>{" "}
-              to swap which one you keep.
+              Each of these lost to something you ranked higher, or to a half-day
+              you are keeping clear. Rank one above its rival to see the week the
+              other way round.
             </p>
             <ul class="dropped">
-              {dropped.map((drop) => (
+              {dropped.map((drop) => {
+                const rival = rivalOf(drop);
+                return (
                 <li class={`tone-${tone.get(drop.course.id)}`}>
                   <p class="dropped-head">
                     <span class="course-code">{drop.course.code}</span>
@@ -217,8 +243,21 @@ for (const slot of timetable) {
                       ))}
                     </ul>
                   )}
+                  {rival && (
+                    <form
+                      class="swap"
+                      method="post"
+                      action={`/api/selections/${selectionFor.get(drop.course.id)}/promote`}
+                    >
+                      <input type="hidden" name="aheadOf" value={selectionFor.get(rival.id)} />
+                      <button class="quiet">
+                        Rank {drop.course.code} above {rival.code}
+                      </button>
+                    </form>
+                  )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </>
         )}
