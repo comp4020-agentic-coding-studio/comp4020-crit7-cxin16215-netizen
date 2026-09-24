@@ -1,0 +1,55 @@
+---
+import "../styles.css";
+
+interface Props {
+  title: string;
+  /** Wide enough for the week grid. Prose pages stay narrow. */
+  wide?: boolean;
+}
+
+const { title, wide = false } = Astro.props;
+const here = Astro.url.pathname;
+
+const links = [
+  { href: "/", label: "Wishlist" },
+  { href: "/times/", label: "My times" },
+  { href: "/schedule/", label: "Schedule" },
+  { href: "/readme/", label: "About" },
+];
+---
+
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif&display=swap"
+    />
+  </head>
+  <body>
+    <header class="masthead">
+      <nav aria-label="site">
+        <span class="brand">Coursefit</span>
+        <ul>
+          {
+            links.map((link) => (
+              <li>
+                <a href={link.href} aria-current={here === link.href ? "page" : undefined}>
+                  {link.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+    </header>
+    <main class={wide ? "wide" : undefined}>
+      <slot />
+    </main>
+  </body>
+</html>

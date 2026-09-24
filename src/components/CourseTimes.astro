@@ -1,0 +1,30 @@
+---
+import type { CatalogCourse } from "../lib/scheduler";
+
+interface Props {
+  course: CatalogCourse;
+}
+
+const { course } = Astro.props;
+---
+
+<ul class="components">
+  {
+    course.components.map((component) => (
+      <li>
+        <span class="kind">{component.name}</span>
+        {component.options.length === 0 ? (
+          <span class="slots">no times listed</span>
+        ) : component.options.length === 1 ? (
+          <span class="slots">
+            {component.options[0].label} <span class="fixed">fixed</span>
+          </span>
+        ) : (
+          <span class="slots">
+            one of {component.options.map((option) => option.label).join("  ·  ")}
+          </span>
+        )}
+      </li>
+    ))
+  }
+</ul>

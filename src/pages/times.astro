@@ -1,0 +1,92 @@
+---
+import Base from "../layouts/Base.astro";
+import { listPreferences } from "../lib/db";
+import { DAYS, type Day, type Half, type Stance, halfKey } from "../lib/scheduler";
+
+const preferences = listPreferences();
+
+const DAY_NAMES: Record<Day, string> = {
+  Mon: "Monday",
+  Tue: "Tuesday",
+  Wed: "Wednesday",
+  Thu: "Thursday",
+  Fri: "Friday",
+};
+
+const HALF_NAMES: Record<Half, string> = { am: "Morning", pm: "Afternoon" };
+
+// Plain language rather than the stored values: "no" is a rule, "prefer" is a
+// wish, and the difference is exactly what the scheduler does with them.
+const STANCES: { value: Stance; label: string }[] = [
+  { value: "prefer", label: "Aim for it" },
+  { value: "ok", label: "Fine either way" },
+  { value: "no", label: "Keep it clear" },
+];
+
+const stanceAt = (day: Day, half: Half): Stance => preferences[halfKey(day, half)] ?? "ok";
+---
+
+<Base title="My times" wide>
+  <h1>My times</h1>
+  <p class="lede">
+    Say how each half of each day suits you. This never costs you a course —
+    it only decides which tutorial a course takes when it has a choice.
+  </p>
+
+  <h2>The week</h2>
+  <form method="post" action="/api/preferences">
+    <div class="grid-scroll">
+      <table class="prefs">
+        <thead>
+          <tr>
+            <th scope="col">Half-day</th>
+            {DAYS.map((day) => <th scope="col">{DAY_NAMES[day]}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {
+            (["am", "pm"] as Half[]).map((half) => (
+              <tr>
+                <th scope="row">{HALF_NAMES[half]}</th>
+                {DAYS.map((day) => (
+                  <td>
+                    <select
+                      name={halfKey(day, half)}
+                      aria-label={`${DAY_NAMES[day]} ${HALF_NAMES[half].toLowerCase()}`}
+                    >
+                      {STANCES.map((stance) => (
+                        <option value={stance.value} selected={stanceAt(day, half) === stance.value}>
+                          {stance.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                ))}
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="actions">
+      <button>Save my times</button>
+    </p>
+  </form>
+
+  <h2>What these do</h2>
+  <ul class="notes">
+    <li>
+      <strong>Keep it clear</strong> is a rule. Nothing will be timetabled into
+      that half-day — and if a course's lecture only runs then, that course is
+      dropped and says so.
+    </li>
+    <li>
+      <strong>Aim for it</strong> is a wish. Among the times a course could
+      already have taken, it goes for the ones landing here.
+    </li>
+    <li>
+      When nothing else separates two options, the one on a day you are already
+      coming in for wins, so the week gathers rather than scatters.
+    </li>
+  </ul>
+</Base>

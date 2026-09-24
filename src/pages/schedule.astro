@@ -1,0 +1,233 @@
+---
+import Base from "../layouts/Base.astro";
+import { listCatalog, listPreferences, listSelections } from "../lib/db";
+import {
+  DAYS,
+  type Day,
+  type DroppedCourse,
+  type Half,
+  type Obstacle,
+  type PlacedSlot,
+  type SlotOption,
+  byTimetableOrder,
+  failedOnCombination,
+  generateSchedule,
+  placedSlots,
+} from "../lib/scheduler";
+
+// Worked out fresh on every request rather than stored. The schedule is a pure
+// function of the wishlist and the week's preferences, so there is no
+// "regenerate" button to forget: change either and the week is already
+// different next time you look.
+const catalog = listCatalog();
+const wishlist = listSelections(catalog);
+const preferences = listPreferences();
+const { included, dropped } = generateSchedule(catalog, wishlist, preferences);
+
+const timetable = placedSlots(included).sort(byTimetableOrder);
+const keptClear = Object.values(preferences).filter((stance) => stance === "no").length;
+const aimedFor = Object.values(preferences).filter((stance) => stance === "prefer").length;
+
+// Only mention the week's preferences when there are any to mention.
+const timeNotes = [
+  keptClear > 0 ? `${keptClear} half-day${keptClear === 1 ? "" : "s"} kept clear` : null,
+  aimedFor > 0 ? `${aimedFor} aimed for` : null,
+]
+  .filter(Boolean)
+  .join(", ");
+
+// A course keeps its colour across every page.
+const tone = new Map(catalog.map((course, index) => [course.id, (index % 7) + 1]));
+
+const DAY_NAMES: Record<Day, string> = {
+  Mon: "Monday",
+  Tue: "Tuesday",
+  Wed: "Wednesday",
+  Thu: "Thursday",
+  Fri: "Friday",
+};
+const HALF_WORDS: Record<Half, string> = { am: "morning", pm: "afternoon" };
+
+const hhmm = (minute: number) =>
+  `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+
+const explain = (option: SlotOption, obstacle: Obstacle): string =>
+  obstacle.kind === "clash"
+    ? `clashes with ${obstacle.with.course.code}, already scheduled at ${obstacle.at.label}`
+    : `is a ${DAY_NAMES[option.day]} ${HALF_WORDS[obstacle.half]} you are keeping clear`;
+
+/** The components with nowhere left to go — the ones worth explaining. */
+const stuck = (drop: DroppedCourse) =>
+  drop.components.filter(
+    (report) =>
+      report.candidates.length === 0 || report.candidates.every((candidate) => candidate.obstacle),
+  );
+
+// Half an hour per row, over whatever span the week actually needs — 9 to 4 at
+// the narrowest, wider if something is scheduled outside it.
+const SLOT = 30;
+const starts = timetable.map((slot) => slot.option.startMinute);
+const ends = timetable.map((slot) => slot.option.endMinute);
+const gridStart = Math.floor(Math.min(9 * 60, ...starts) / 60) * 60;
+// One slot past the last class, so the closing time gets a label of its own
+// instead of the grid just stopping at an unnamed line.
+const gridEnd = Math.ceil(Math.max(16 * 60, ...ends) / 60) * 60 + SLOT;
+const rows = Array.from({ length: (gridEnd - gridStart) / SLOT }, (_, row) => gridStart + row * SLOT);
+
+// Lay the week out once, so the markup below is a straight read of it: a class
+// starts in this cell, a class covers it from above, or it is free.
+type Cell = { kind: "start"; slot: PlacedSlot; span: number } | { kind: "covered" } | { kind: "free" };
+
+const week: Cell[][] = rows.map(() => DAYS.map(() => ({ kind: "free" }) as Cell));
+
+for (const slot of timetable) {
+  const column = DAYS.indexOf(slot.option.day);
+  const from = Math.floor((slot.option.startMinute - gridStart) / SLOT);
+  const to = Math.ceil((slot.option.endMinute - gridStart) / SLOT);
+  if (column < 0 || from < 0 || to > rows.length || to <= from) continue;
+
+  week[from][column] = { kind: "start", slot, span: to - from };
+  for (let row = from + 1; row < to; row++) week[row][column] = { kind: "covered" };
+}
+---
+
+<Base title="Your week" wide={wishlist.length > 0}>
+  <h1>Your week</h1>
+  {
+    wishlist.length === 0 ? (
+      <>
+        <p class="lede">Your wishlist is empty, so there is nothing to schedule yet.</p>
+        <p class="empty">
+          <a href="/">Add some courses</a> and come back.
+        </p>
+      </>
+    ) : (
+      <>
+        <p class="lede">
+          Courses get their pick of the week in priority order, so anything that
+          had to go was outranked by something you wanted more.
+        </p>
+        <p class="summary">
+          <span class="count">
+            {included.length} of {wishlist.length}
+          </span>
+          <span class="hint">
+            {wishlist.length === 1 ? "course" : "courses"} fitted
+            {dropped.length > 0 && <> · {dropped.length} clashed out</>}
+            {timeNotes && (
+              <>
+                {" "}
+                · <a href="/times/">{timeNotes}</a>
+              </>
+            )}
+          </span>
+        </p>
+
+        <h2 id="scheduled">Scheduled</h2>
+        {timetable.length === 0 ? (
+          <p class="empty">Nothing could be placed.</p>
+        ) : (
+          <div class="grid-scroll">
+            <table class="week">
+              <thead>
+                <tr>
+                  <th class="gutter" scope="col">Time</th>
+                  {DAYS.map((day) => (
+                    <th scope="col">{DAY_NAMES[day]}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((minute, row) => (
+                  <tr class={minute % 60 === 0 ? "hour" : undefined}>
+                    <td class="gutter">{minute % 60 === 0 ? hhmm(minute) : ""}</td>
+                    {week[row].map((cell) =>
+                      cell.kind === "covered" ? null : cell.kind === "free" ? (
+                        <td />
+                      ) : (
+                        <td class={`slot tone-${tone.get(cell.slot.course.id)}`} rowspan={cell.span}>
+                          <div class={`block ${cell.slot.component.kind}`}>
+                            <span class="block-code">{cell.slot.course.code}</span>
+                            <span class="block-kind">{cell.slot.component.name}</span>
+                            {/* The column header carries the day on screen; a
+                                block read on its own still needs to say it. */}
+                            <span class="visually-hidden">
+                              {DAY_NAMES[cell.slot.option.day]} {hhmm(cell.slot.option.startMinute)} to {hhmm(cell.slot.option.endMinute)}
+                            </span>
+                            <span class="block-when" aria-hidden="true">
+                              {hhmm(cell.slot.option.startMinute)}–{hhmm(cell.slot.option.endMinute)}
+                            </span>
+                          </div>
+                        </td>
+                      ),
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {dropped.length > 0 && (
+          <>
+            <h2 id="dropped">Couldn't fit</h2>
+            <p class="hint">
+              Raise one of these above its rival on the <a href="/">wishlist</a>{" "}
+              to swap which one you keep.
+            </p>
+            <ul class="dropped">
+              {dropped.map((drop) => (
+                <li class={`tone-${tone.get(drop.course.id)}`}>
+                  <p class="dropped-head">
+                    <span class="course-code">{drop.course.code}</span>
+                    <span class="course-title">{drop.course.title}</span>
+                    <span class="badge">Priority {drop.priority}</span>
+                  </p>
+                  {failedOnCombination(drop) ? (
+                    <p class="hint">
+                      Every part of this course can be timetabled on its own, but not
+                      all at once — its own times overlap each other.
+                    </p>
+                  ) : (
+                    <ul class="reasons">
+                      {stuck(drop).map((report) => (
+                        <li>
+                          <strong>
+                            {report.component.name}
+                            {report.component.options.length === 1
+                              ? " has one time and cannot move"
+                              : " has no group left"}
+                          </strong>
+                          {report.candidates.length === 0 ? (
+                            <> — no times are listed for it.</>
+                          ) : (
+                            <ul>
+                              {report.candidates.map((candidate) => (
+                                <li>
+                                  {candidate.option.label}{" "}
+                                  {candidate.obstacle
+                                    ? explain(candidate.option, candidate.obstacle)
+                                    : "is free"}
+                                  .
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        <p class="actions">
+          <a class="cta" href="/">Adjust the wishlist</a>
+          <a href="/times/">Change my times</a>
+        </p>
+      </>
+    )
+  }
+</Base>

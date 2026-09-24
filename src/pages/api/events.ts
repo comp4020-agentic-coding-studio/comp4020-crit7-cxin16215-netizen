@@ -1,5 +1,4 @@
 import type { APIRoute } from "astro";
-import type { Message } from "../../lib/db";
 import { bus } from "../../lib/events";
 
 // The minimal server-sent-events (SSE) pattern: a long-lived streaming
@@ -7,8 +6,13 @@ import { bus } from "../../lib/events";
 // SSE is one-directional (server → browser) and plain HTTP, which makes it
 // the simplest live channel that works everywhere — reach for WebSockets
 // only when the client needs to push over the same connection.
+//
+// Nothing in the wishlist emits on the bus: the forms POST and redirect, and
+// the page re-renders from SQLite. The endpoint stays because the deploy
+// workflow probes it after every release, and because a second tab watching
+// the wishlist change live is the obvious next thing to build on it.
 export const GET: APIRoute = () => {
-  let onMessage: (message: Message) => void;
+  let onMessage: (message: unknown) => void;
   let heartbeat: ReturnType<typeof setInterval>;
 
   const stream = new ReadableStream<string>({

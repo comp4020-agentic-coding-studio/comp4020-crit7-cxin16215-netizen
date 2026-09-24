@@ -1,53 +1,172 @@
 ---
-import { listMessages } from "../lib/db";
-import "../styles.css";
+import CourseTimes from "../components/CourseTimes.astro";
+import Base from "../layouts/Base.astro";
+import { listCatalog, listSelections } from "../lib/db";
 
-const messages = listMessages();
+const catalog = listCatalog();
+const wishlist = listSelections(catalog);
+
+const wishlisted = new Set(wishlist.map((row) => row.courseId));
+const available = catalog.filter((course) => !wishlisted.has(course.id));
+// Default the new course to the back of the queue, so adding one never quietly
+// outranks something already on the list.
+const nextPriority = wishlist.reduce((max, row) => Math.max(max, row.priority), 0) + 1;
+
+// A course keeps its colour across every page.
+const tone = new Map(catalog.map((course, index) => [course.id, (index % 7) + 1]));
 ---
 
-<!doctype html>
-<html lang="en-AU">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>COMP4020 prototype</title>
-  </head>
-  <body>
-    <nav aria-label="site">
-      <a href="/">Guestbook</a>
-      <a href="/readme/">About</a>
-    </nav>
-    <main>
-      <h1>Guestbook</h1>
-      <p>
-        A minimal full-stack starter: messages live in SQLite on the machine's
-        volume (state survives a reload and a redeploy), and new messages
-        appear in every open tab over a server-sent-events stream — open this
-        page twice and sign it in one. Replace all of this with your own
-        prototype.
-      </p>
-      <form method="post" action="/api/messages">
-        <label for="body">Leave a message</label>
-        <input id="body" name="body" required maxlength="500" />
-        <button>Sign</button>
-      </form>
-      <ul id="messages">
-        {messages.map((message) => <li>{message.body}</li>)}
-      </ul>
-    </main>
-    <script>
-      // The live half of the demo: subscribe to the SSE stream and prepend
-      // messages as they arrive. The form itself needs none of this — its
-      // POST + redirect re-renders the submitting tab from SQLite; this
-      // stream is how every other tab finds out.
-      const list = document.querySelector("#messages");
-      const source = new EventSource("/api/events");
-      source.addEventListener("message", (event) => {
-        const message = JSON.parse(event.data);
-        const item = document.createElement("li");
-        item.textContent = message.body;
-        list?.prepend(item);
-      });
-    </script>
-  </body>
-</html>
+<Base title="My course wishlist">
+  <h1>My course wishlist</h1>
+  <p class="lede">
+    Pick the courses you want and say how much you want each one. Nothing is
+    ruled out while you choose — put everything you'd like on the list, then
+    generate a week and find out what actually fits.
+  </p>
+
+  <h2>Add a course</h2>
+  {
+    available.length === 0 ? (
+      <p class="empty">Every course in the catalog is already on your wishlist.</p>
+    ) : (
+      <div class="card">
+        <form method="post" action="/api/selections">
+          <div class="field-row">
+            <div class="field">
+              <label for="courseId">Course</label>
+              <select id="courseId" name="courseId" required>
+                {available.map((course) => (
+                  <option value={course.id}>
+                    {course.code} — {course.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="field narrow">
+              <label for="priority">Priority</label>
+              <input
+                id="priority"
+                type="number"
+                name="priority"
+                min="1"
+                step="1"
+                required
+                value={nextPriority}
+              />
+            </div>
+            <button>Add</button>
+          </div>
+        </form>
+      </div>
+    )
+  }
+  <p class="hint">
+    Lower numbers go first: 1 is the course you most want. Two courses can share
+    a number — whichever you added first wins the tie.
+  </p>
+
+  <h2>Your wishlist</h2>
+  {
+    wishlist.length === 0 ? (
+      <p class="empty">Nothing here yet. Add a course above to get started.</p>
+    ) : (
+      <>
+        <div class="panel">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Priority</th>
+                <th scope="col">Course</th>
+                <th scope="col">Lectures &amp; tutorials</th>
+                <th scope="col" class="col-actions">
+                  <span class="visually-hidden">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {wishlist.map((row) => (
+                <tr>
+                  <td>
+                    <form class="rank" method="post" action={`/api/selections/${row.id}/priority`}>
+                      <input
+                        type="number"
+                        name="priority"
+                        min="1"
+                        step="1"
+                        required
+                        value={row.priority}
+                        aria-label={`Priority for ${row.course.code}`}
+                      />
+                      <button class="quiet">Save</button>
+                    </form>
+                  </td>
+                  <td>
+                    <span class={`course tone-${tone.get(row.course.id)}`}>
+                      <span class="chip" />
+                      <span>
+                        <span class="course-code">{row.course.code}</span>{" "}
+                        <span class="course-title">{row.course.title}</span>
+                      </span>
+                    </span>
+                  </td>
+                  <td>
+                    <CourseTimes course={row.course} />
+                  </td>
+                  <td class="col-actions">
+                    <form method="post" action={`/api/selections/${row.id}/delete`}>
+                      <button class="quiet" aria-label={`Remove ${row.course.code} from wishlist`}>
+                        Remove
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p class="actions">
+          <a class="cta" href="/schedule/">Generate my week</a>
+          <span class="hint">
+            {wishlist.length} {wishlist.length === 1 ? "course" : "courses"} to place
+          </span>
+        </p>
+      </>
+    )
+  }
+
+  <h2>Course catalog</h2>
+  <p class="hint">
+    A lecture runs at one time and cannot move. A tutorial is offered in several
+    groups, and the scheduler picks whichever group still fits.
+  </p>
+  <div class="panel">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Course</th>
+          <th scope="col">Lectures &amp; tutorials</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          catalog.map((course) => (
+            <tr>
+              <td>
+                <span class={`course tone-${tone.get(course.id)}`}>
+                  <span class="chip" />
+                  <span>
+                    <span class="course-code">{course.code}</span>{" "}
+                    <span class="course-title">{course.title}</span>
+                  </span>
+                </span>
+              </td>
+              <td>
+                <CourseTimes course={course} />
+              </td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+</Base>
