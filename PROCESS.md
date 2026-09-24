@@ -27,8 +27,8 @@ On 24 September, I asked the agent to look for the next thing worth fixing and
 to inspect the app in a real browser at desktop and phone width. It found a
 two-hour lecture drawn as one hour and a wishlist that ran off the phone screen.
 Both had passed the tests ([`5a8bb61`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-cxin16215-netizen/commit/5a8bb61)). It also noticed that a shared wishlist would let
-everyone at the crit edit the same week. I scoped the wishlist to a visitor
-cookie and added a button to rank a dropped course above the course that beat
+everyone at the crit edit the same week. I had it scope the wishlist to a visitor
+cookie and add a button to rank a dropped course above the course that beat
 it, so someone can see the trade for themselves ([`cc036a4`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit7-cxin16215-netizen/commit/cc036a4)).
 
 That browser pass changed my rule for finishing a page. `CLAUDE.md` now asks for
