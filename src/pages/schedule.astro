@@ -156,7 +156,12 @@ for (const slot of timetable) {
                 <tr>
                   <th class="gutter" scope="col">Time</th>
                   {DAYS.map((day) => (
-                    <th scope="col">{DAY_NAMES[day]}</th>
+                    <th scope="col">
+                      {/* Five full names don't fit across a phone; the short
+                          one is for the eye, the long one for everyone. */}
+                      <span class="day-long">{DAY_NAMES[day]}</span>
+                      <span class="day-short" aria-hidden="true">{day}</span>
+                    </th>
                   ))}
                 </tr>
               </thead>

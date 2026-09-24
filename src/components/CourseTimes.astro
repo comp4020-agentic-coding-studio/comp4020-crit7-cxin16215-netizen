@@ -17,11 +17,18 @@ const { course } = Astro.props;
           <span class="slots">no times listed</span>
         ) : component.options.length === 1 ? (
           <span class="slots">
-            {component.options[0].label} <span class="fixed">fixed</span>
+            <span class="when">{component.options[0].label}</span> <span class="fixed">fixed</span>
           </span>
         ) : (
           <span class="slots">
-            one of {component.options.map((option) => option.label).join("  ·  ")}
+            {/* A line may break between times, never inside one. */}
+            one of{" "}
+            {component.options.map((option, index) => (
+              <>
+                {index > 0 && " · "}
+                <span class="when">{option.label}</span>
+              </>
+            ))}
           </span>
         )}
       </li>

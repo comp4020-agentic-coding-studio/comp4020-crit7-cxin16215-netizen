@@ -424,16 +424,21 @@ table {
   transform: translateY(-0.45em);
 }
 
+/* The block is pinned to the cell's edges rather than sized with height: 100%,
+   which a rowspan cell doesn't resolve: a two-hour lecture would otherwise
+   shrink to its text and float in the middle, reading as 10:30 to 11:30. */
 .week td.slot {
-  padding: 1px 2px;
+  position: relative;
+  padding: 0;
 }
 
 .block {
+  position: absolute;
+  inset: 1px 2px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.05rem;
-  height: 100%;
   padding: 0.3rem 0.55rem;
   border-radius: 7px;
   border-left: 3px solid var(--tone-edge);
@@ -504,6 +509,10 @@ table {
   color: var(--ink-soft);
 }
 
+.when {
+  white-space: nowrap;
+}
+
 .fixed {
   padding: 0.02rem 0.35rem;
   border: 1px solid var(--line);
@@ -518,7 +527,6 @@ table {
 /* ----------------------------------------------------- the week's stance -- */
 
 .prefs {
-  min-width: 44rem;
   table-layout: fixed;
 }
 
@@ -611,6 +619,10 @@ table {
   color: var(--ink-soft);
 }
 
+.swap {
+  margin-top: 0.75rem;
+}
+
 /* ------------------------------------------------------------------ misc -- */
 
 .summary {
@@ -634,6 +646,22 @@ table {
   color: var(--ink-soft);
 }
 
+.empty p {
+  margin: 0;
+}
+
+.try {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 1.1rem;
+}
+
+.day-short {
+  display: none;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -653,4 +681,122 @@ main :is(p, li) code {
   background: var(--surface-sunk);
   border: 1px solid var(--line);
   font-size: 0.9em;
+}
+
+/* ------------------------------------------------------------------ phone -- */
+
+@media (max-width: 40rem) {
+  main {
+    padding-inline: 1rem;
+  }
+
+  /* All five days across the screen at once, rather than a grid that hides
+     Wednesday to Friday off to the right. The time moves into the grid's own
+     rows; each block still states it for a screen reader. */
+  .week {
+    min-width: 0;
+  }
+
+  .week thead th {
+    padding: 0.6rem 0.15rem;
+    letter-spacing: 0.03em;
+  }
+
+  .week thead th.gutter {
+    width: 2.4rem;
+  }
+
+  .week td.gutter {
+    padding-right: 0.35rem;
+    font-size: 0.66rem;
+  }
+
+  .day-long {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .day-short {
+    display: inline;
+  }
+
+  .block {
+    inset: 1px;
+    padding: 0.25rem 0.15rem 0.25rem 0.25rem;
+    border-left-width: 2px;
+    border-radius: 5px;
+  }
+
+  .block-code {
+    font-size: 0.62rem;
+    letter-spacing: -0.03em;
+  }
+
+  .block-kind {
+    font-size: 0.56rem;
+    letter-spacing: 0.02em;
+  }
+
+  .block-when {
+    display: none;
+  }
+
+  /* Wishlist and catalog rows become cards: the course, then its times, then
+     the controls, instead of four columns squeezed until the last two fall off
+     the edge of the panel. */
+  .stack thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .stack,
+  .stack tbody,
+  .stack td {
+    display: block;
+  }
+
+  .stack tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.6rem 0.75rem;
+    align-items: center;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .stack tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .stack td,
+  .panel .stack td {
+    padding: 0;
+    border: 0;
+  }
+
+  .stack .cell-course {
+    grid-column: 1 / -1;
+    order: -2;
+  }
+
+  .stack .cell-times {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+
+  .prefs tbody th {
+    width: 6rem;
+    padding-inline: 0.6rem;
+  }
+
+  .prefs td {
+    padding: 0.4rem 0.3rem;
+  }
 }
